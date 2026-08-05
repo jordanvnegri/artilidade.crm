@@ -596,7 +596,7 @@ function AdminDashboard(props) {
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={function() { props.onSelect(c); }}
                         style={{ padding: "5px 12px", borderRadius: 7, background: C.primaryLight, color: C.primary, border: "1px solid " + C.primaryMid, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Ver</button>
-                      {confirmDelId === c.id ? (
+                      {props.isMaster && (confirmDelId === c.id ? (
                         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                           <span style={{ fontSize: 11, color: C.danger, fontWeight: 600 }}>Confirmar?</span>
                           <button onClick={function() { deleteClient(c.id); }} style={{ padding: "4px 8px", borderRadius: 6, background: C.dangerLight, color: C.danger, border: "none", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Sim</button>
@@ -605,7 +605,7 @@ function AdminDashboard(props) {
                       ) : (
                         <button onClick={function() { setConfirmDelId(c.id); }}
                           style={{ padding: "5px 10px", borderRadius: 7, background: C.dangerLight, color: C.danger, border: "none", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Excluir</button>
-                      )}
+                      ))}
                     </div>
                   </td>
                 </tr>
@@ -747,7 +747,7 @@ function AdminClientDetail(props) {
                   <Btn size="sm" variant={s.status === "Concluido" ? "ghost" : "success"} onClick={function() { toggleDone(s); }}>
                     {s.status === "Concluido" ? "Desfazer" : "Concluir"}
                   </Btn>
-                  <Btn size="sm" variant="danger" onClick={function() { deleteStage(s.id); }}>Excluir</Btn>
+                  {props.isMaster && <Btn size="sm" variant="danger" onClick={function() { deleteStage(s.id); }}>Excluir</Btn>}
                 </div>
               </div>
             </Card>
@@ -760,17 +760,29 @@ function AdminClientDetail(props) {
           <span style={{ fontSize: 11, fontWeight: 700, color: C.gold, textTransform: "uppercase", letterSpacing: 1 }}>Anotacoes internas</span>
           <span style={{ fontSize: 11, color: C.gray }}>(visivel apenas ao admin)</span>
         </div>
-        <div style={{ background: C.goldLight, border: "1px solid #F59E0B44", borderRadius: 12, padding: 16 }}>
-          <textarea value={noteText} onChange={function(e) { setNoteText(e.target.value); setNoteSaved(false); }}
-            placeholder="Dados de acesso, logins, senhas, observacoes..."
-            style={{ width: "100%", minHeight: 140, padding: "12px 14px", border: "1px solid #F59E0B88", borderRadius: 8, fontSize: 13.5, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box", background: "#FFFDF0", fontFamily: "Inter, system-ui, sans-serif" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-            <button onClick={saveNote} style={{ padding: "6px 16px", borderRadius: 8, background: C.goldLight, color: C.gold, border: "1px solid #F59E0B88", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              {noteSaved ? "✓ Salvo!" : "Salvar anotacoes"}
-            </button>
-            {noteSaved && <span style={{ fontSize: 12, color: C.success, fontWeight: 600 }}>Salvo com sucesso</span>}
+        {props.isMaster ? (
+          <div style={{ background: C.goldLight, border: "1px solid #F59E0B44", borderRadius: 12, padding: 16 }}>
+            <textarea value={noteText} onChange={function(e) { setNoteText(e.target.value); setNoteSaved(false); }}
+              placeholder="Dados de acesso, logins, senhas, observacoes..."
+              style={{ width: "100%", minHeight: 140, padding: "12px 14px", border: "1px solid #F59E0B88", borderRadius: 8, fontSize: 13.5, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box", background: "#FFFDF0", fontFamily: "Inter, system-ui, sans-serif" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+              <button onClick={saveNote} style={{ padding: "6px 16px", borderRadius: 8, background: C.goldLight, color: C.gold, border: "1px solid #F59E0B88", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                {noteSaved ? "✓ Salvo!" : "Salvar anotacoes"}
+              </button>
+              {noteSaved && <span style={{ fontSize: 12, color: C.success, fontWeight: 600 }}>Salvo com sucesso</span>}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div>
+            {noteText && (
+              <div style={{ background: C.goldLight, border: "1px solid #F59E0B44", borderRadius: 12, padding: 16, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 8 }}>Anotacoes do Master (somente leitura)</div>
+                <div style={{ background: "#FFFDF0", border: "1px solid #F59E0B44", borderRadius: 8, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.6, color: C.text, whiteSpace: "pre-wrap" }}>{noteText}</div>
+              </div>
+            )}
+            <AdminNotesGestor clientId={props.clientId} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1036,6 +1048,59 @@ function ClientTickets(props) {
   );
 }
 
+
+// ── Notas do Gestor (nao pode editar notas do Master) ─────────────────────────
+function AdminNotesGestor(props) {
+  var [notes, setNotes] = useState([]);
+  var [text, setText] = useState("");
+  var [saved, setSaved] = useState(false);
+  var [loading, setLoading] = useState(true);
+
+  useEffect(function() { loadNotes(); }, [props.clientId]);
+
+  async function loadNotes() {
+    setLoading(true);
+    try {
+      var n = await get("gestor_notes", "client_id=eq." + props.clientId + "&order=created_at.asc");
+      setNotes(n);
+    } catch(e) { setNotes([]); }
+    setLoading(false);
+  }
+
+  async function saveNote() {
+    if (!text.trim()) return;
+    try {
+      await post("gestor_notes", { client_id: props.clientId, content: text, created_at: new Date().toISOString().slice(0,10) });
+      setText(""); setSaved(true);
+      setTimeout(function() { setSaved(false); }, 2000);
+      await loadNotes();
+    } catch(e) {}
+  }
+
+  return (
+    <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, marginBottom: 10 }}>Suas anotacoes</div>
+      {!loading && notes.map(function(n) {
+        return (
+          <div key={n.id} style={{ background: "#fff", border: "1px solid #BAE6FD", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 4 }}>📅 {n.created_at}</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{n.content}</div>
+          </div>
+        );
+      })}
+      {!loading && notes.length === 0 && <div style={{ fontSize: 13, color: C.gray, marginBottom: 10 }}>Nenhuma anotacao ainda.</div>}
+      <textarea value={text} onChange={function(e) { setText(e.target.value); }} placeholder="Adicionar nova anotacao..."
+        style={{ width: "100%", minHeight: 100, padding: "10px 12px", border: "1px solid #BAE6FD", borderRadius: 8, fontSize: 13, lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box", background: "#fff", fontFamily: "Inter, system-ui, sans-serif" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+        <button onClick={saveNote} style={{ padding: "6px 16px", borderRadius: 8, background: C.primaryLight, color: C.primary, border: "1px solid " + C.primaryMid, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          {saved ? "✓ Salvo!" : "Adicionar anotacao"}
+        </button>
+        {saved && <span style={{ fontSize: 12, color: C.success, fontWeight: 600 }}>Salvo com sucesso</span>}
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   var [currentUser, setCurrentUser] = useState(null);
@@ -1055,8 +1120,8 @@ export default function App() {
     if (isAdmin) {
       if (page === "users") return <UserManagement />;
       if (page === "tickets") return <AdminTickets />;
-      if (selectedClientId) return <AdminClientDetail clientId={selectedClientId} onBack={function() { setSelectedClientId(null); }} />;
-      return <AdminDashboard user={currentUser} onSelect={function(c) { setSelectedClientId(c.id); }} />;
+      if (selectedClientId) return <AdminClientDetail clientId={selectedClientId} isMaster={currentUser.role === "master"} onBack={function() { setSelectedClientId(null); }} />;
+      return <AdminDashboard user={currentUser} isMaster={currentUser.role === "master"} onSelect={function(c) { setSelectedClientId(c.id); }} />;
     }
     if (page === "tickets") return <ClientTickets clientId={currentUser.client_id} />;
     return <ClientProject clientId={currentUser.client_id} />;
